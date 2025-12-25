@@ -16,8 +16,8 @@ function loadSettings() {
 
                 <div class="inline-drawer-content">
                     <div class="styled_description_block">
-                        Extension by ${authorConfig.name} <br>
-                        <small>สถานะ: พร้อมทำงาน</small>
+                        
+                        <small>Created by <a href="https://bio.site/deMors" target="_blank" rel="noopener noreferrer">Mors</a> with help of POPKO<br>Hopefully, hopefully, you guys enjoy it.</small>
                     </div>
                     <hr>
                     <div style="text-align: center; color: #aaa; padding: 20px;">
