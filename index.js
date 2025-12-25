@@ -15,9 +15,8 @@ function loadSettings() {
                 </div>
 
                 <div class="inline-drawer-content">
-                    <div class="styled_description_block">
-                        
-                        <small style="text-align: center;">Created by <a href="https://bio.site/deMors" target="_blank" rel="noopener noreferrer">Mors</a> with help of POPKO<br>Hopefully, you guys enjoy it. Have fun:)</small>
+                    <div class="styled_description_block" style="text-align: center;"> 
+                        <small>Created by <a href="https://bio.site/deMors" target="_blank" rel="noopener noreferrer">Mors</a> with help of POPKO<br>Hopefully, you guys enjoy it. Have fun:)</small>
                     </div>
                     <hr>
                     <div style="text-align: center; color: #aaa; padding: 20px;">
