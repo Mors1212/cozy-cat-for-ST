@@ -51,5 +51,6 @@ This extension listens for specific **hidden HTML comments** in the AI's output 
 ## 🔥 Special Thanks: 
 - POPKO: Thanks for helping me start things off; otherwise, I wouldn’t know where to begin.
 - Zeal: Without you, I would have released the extension without realizing there was a serious issue.
-- Fox.Jong, Malibee, Madee, Phakrop: Thank for being helpful testers.  
+- Fox.Jong, Malibee, Madee, Hamster: Thank for being helpful testers.
+- Phakrop: My Luck Bringer.
 
