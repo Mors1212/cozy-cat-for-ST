@@ -1,0 +1,12 @@
+{
+  "display_name": "Cozy Cat for ST",
+  "loading_order": 100,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "Mors",
+  "version": "1.0",
+  "homePage": "https://github.com/Mors1212/cozy-cat-for-ST.git",
+  "description": "extension for your fluffy cat"
+}

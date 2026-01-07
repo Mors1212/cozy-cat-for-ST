@@ -1,0 +1,919 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=DM+Sans:wght@400;500;700&family=Playfair+Display:ital,wght@0,600;1,600&family=La+Belle+Aurore&family=Mali:wght@700&display=swap");
+
+/* =========================
+   CozyCat isolation (SAFE)
+   ========================= */
+.cozycat-overlay {
+  color: #2C2420;
+  font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  filter: none !important;
+  transform: none !important;
+}
+
+.cozycat-overlay *,
+.cozycat-overlay *::before,
+.cozycat-overlay *::after {
+  box-sizing: border-box;
+}
+
+.cozycat-overlay a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* กันธีมอื่นที่ชอบไปยัดเส้น/สีให้ headings */
+.cozycat-overlay h1,
+.cozycat-overlay h2,
+.cozycat-overlay h3 {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  color: inherit !important;
+}
+
+/* =========================
+   Paw button
+   ========================= */
+.cozycat-paw-btn {
+  position: fixed;
+  z-index: 999999;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 1px solid rgba(66, 66, 66, 0.12);
+  background: rgba(240, 240, 240, 0.908);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.cozycat-paw-btn:active { cursor: grabbing; }
+.cozycat-paw-emoji { font-size: 26px; line-height: 1; }
+
+/* =========================
+   Overlay backdrop
+   ========================= */
+.cozycat-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999998;
+  display: none; /* toggled by JS */
+  align-items: center;
+  justify-content: center;
+
+  padding:
+    calc(14px + env(safe-area-inset-top))
+    calc(14px + env(safe-area-inset-right))
+    calc(14px + env(safe-area-inset-bottom))
+    calc(14px + env(safe-area-inset-left));
+
+  background: rgba(0, 0, 0, 0.55);
+}
+
+/* =========================
+   Screen container (ratio 1:2)
+   ========================= */
+.cozycat-screen {
+  aspect-ratio: 1 / 2;
+
+  height: min(640px, 88vh);
+  width: auto;
+  max-width: 92vw;
+
+  border-radius: 30px;
+  overflow: hidden;
+  border: 8px solid #111827;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+  position: relative;
+
+  background-color: #F7F5F0;
+  background-image: url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%239C92AC' fill-opacity='0.1' fill-rule='evenodd'%3E%3Cpath d='M5 0h1L0 6V5zM6 5v1H5z'/%3E%3C/g%3E%3C/svg%3E");
+
+  padding: 0; 
+}
+
+.cozycat-screen-inner {
+  height: 100%;
+  position: relative;
+}
+
+/* fallback if no aspect-ratio support */
+@supports not (aspect-ratio: 1 / 2) {
+  .cozycat-screen {
+    width: min(320px, 92vw);
+    height: min(640px, 88vh);
+  }
+}
+
+/* =========================
+   HOME layout 
+   ========================= */
+.cozycat-home {
+  height: 100%;
+  padding: 32px; /* (ใส่ padding ที่นี่แทน)*/
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+}
+
+.cozycat-header-small {
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  font-weight: 700;
+  color: #9ca3af;
+  margin: 16px 0 14px;
+}
+
+.cozycat-title {
+  font-family: "Playfair Display", serif;
+  font-size: 60px;
+  line-height: 0.9;
+  font-weight: 600;
+  margin: 0;
+}
+
+.cozycat-title-italic { font-style: italic; }
+.cozycat-title-normal { font-style: normal; }
+
+.cozycat-title-indent {
+  margin-left: 32px;
+  display: inline-block;
+}
+
+.cozycat-title-rule {
+  width: 64px;
+  height: 2px;
+  background: #2C2420;
+  margin-top: 24px;
+  margin-left: 8px;
+}
+
+.cozycat-watermark {
+  position: absolute;
+  top: 43%;
+  right: -20px;
+  transform: rotate(90deg);
+  opacity: 0.10;
+  pointer-events: none;
+  font-family: "Cinzel", serif;
+  font-size: 96px;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+}
+
+.cozycat-menu {
+  margin-bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.cozycat-menu-item {
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+.cozycat-menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #d1d5db;
+  padding-bottom: 8px;
+  transition: border-color 150ms ease;
+}
+
+.cozycat-menu-item:hover .cozycat-menu-row {
+  border-bottom-color: #000;
+}
+
+.cozycat-menu-num {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+.cozycat-menu-label {
+  font-size: 18px;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.cozycat-footer {
+  text-align: center;
+  font-family: "La Belle Aurore", cursive;
+  color: #6b7280;
+  font-size: 20px;
+}
+
+/* =========================
+   CARD screen layout 
+   ========================= */
+.cozycat-card-screen {
+  height: 100%;
+  width: 100%;
+  position: relative;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center; 
+  align-items: center;
+}
+
+.cozycat-card-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+/* Back button */
+.cozycat-back {
+  position: absolute;
+  top: 34px;   
+  left: 12px;  
+  z-index: 20;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  background: transparent;
+  border: 0;
+  padding: 6px 2px;
+  border-radius: 10px;
+
+  cursor: pointer;
+  user-select: none;
+
+  color: rgba(44, 36, 32, 0.75);
+  opacity: 0.6;
+  transition: opacity 0.2s ease, background 0.2s ease;
+  font-family: "DM Sans", system-ui, sans-serif;
+}
+
+.cozycat-back:hover { opacity: 1; background: rgba(0,0,0,0.03); }
+.cozycat-back-text { font-size: 14px; font-weight: 700; letter-spacing: 0.025em; }
+.cozycat-back-svg { display: block; }
+
+/* Signature footer */
+.cozycat-card-signature {
+  position: absolute;
+  bottom: 32px;
+  text-align: center;
+  opacity: 0.8;
+  pointer-events: none;
+}
+.cozycat-card-signature span {
+  font-family: "La Belle Aurore", cursive;
+  color: #9ca3af;
+  font-size: 18px;
+  letter-spacing: 0.05em;
+}
+
+/* =========================
+   Card flip component (namespaced)
+   ========================= */
+.cozycat-card {
+  width: 280px;
+  height: 420px;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: 0.6s cubic-bezier(.4,.2,.2,1);
+  cursor: pointer;
+  outline: 0;
+}
+.cozycat-card.is-flipped { transform: rotateY(180deg); }
+
+.cozycat-card-front,
+.cozycat-card-back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 10px 25px #0002;
+  background: #fff;
+}
+.cozycat-card-front { border: 6px solid #fff; }
+
+.cozycat-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cozycat-card-hint {
+  position: absolute;
+  bottom: 15px;
+  right: 15px;
+  background: #C19A6Bd9;
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font: 700 12px "Mali", cursive;
+  pointer-events: none;
+  backdrop-filter: blur(2px);
+}
+
+.cozycat-card-back {
+  transform: rotateY(180deg);
+  background: #EFEFEF;
+  padding: 25px;
+  display: flex;
+  flex-direction: column;
+  font-family: "Times New Roman", serif;
+  color: #111;
+}
+
+.cozycat-card-watermark {
+  position: absolute;
+  top: -25px;
+  left: -20px;
+  font: 700 120px Arial, sans-serif;
+  color: #fff;
+  line-height: 1;
+  z-index: 0;
+}
+
+.cozycat-card-content {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.cozycat-card-sub {
+  font: 10px sans-serif;
+  letter-spacing: 2px;
+  color: #555;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.cozycat-card-title {
+  font: italic 400 32px/.9 serif;
+  margin: 0 0 20px;
+}
+
+.cozycat-card-body {
+  border-top: 2px solid #000;
+  padding-top: 15px;
+  margin-top: auto;
+}
+
+.cozycat-card-stats {
+  display: flex;
+  justify-content: space-between;
+  font: 700 11px sans-serif;
+  letter-spacing: .5px;
+  margin-bottom: 15px;
+  text-transform: uppercase;
+  color: #333;
+}
+
+.cozycat-card-personality-label {
+  font-style: italic;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.cozycat-card-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #222;
+}
+
+.cozycat-card-list li::before {
+  content: "— ";
+  color: #888;
+}
+
+.cozycat-card-icon {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  font-size: 30px;
+  opacity: 0.8;
+}
+
+/* =========================
+   STATUS screen
+   ========================= */
+
+.cozycat-status-screen {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Profile (top) */
+.cozycat-status-profile {
+  padding: 72px 32px 24px;
+  text-align: center;
+  border-bottom: 1px solid rgba(44,36,32,0.12);
+}
+
+.cozycat-status-avatar-wrap {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 16px;
+}
+
+.cozycat-status-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.cozycat-status-badge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: #2C2420;
+  color: #fff;
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.cozycat-status-name {
+  font-family: "Playfair Display", serif;
+  font-size: 36px;
+  font-style: italic;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.cozycat-status-meta {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: #6b7280;
+  font-weight: 700;
+}
+
+/* Stats (bottom) */
+.cozycat-status-stats {
+  flex: 1;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+}
+
+.cozycat-status-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cozycat-status-row-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cozycat-status-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "Cinzel", serif;
+}
+
+.cozycat-status-value {
+  color: #9ca3af;
+}
+
+.cozycat-status-bar-bg {
+  width: 100%;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.cozycat-status-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: #2C2420;
+  border-radius: 3px;
+  transition: width 1.2s cubic-bezier(.22,1,.36,1);
+}
+
+/* Footer */
+.cozycat-status-footer {
+  text-align: center;
+  padding-bottom: 24px;
+  font-family: "La Belle Aurore", cursive;
+  color: #9ca3af;
+  font-size: 18px;
+}
+
+/* =========================
+   Placeholder pages (status/music) -> ใส่ padding ให้พวกนี้
+   ========================= */
+.cozycat-page-screen {
+  height: 100%;
+  width: 100%;
+  position: relative;
+}
+
+.cozycat-page {
+  height: 100%;
+  padding: 32px;        
+  padding-top: 56px;   
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.cozycat-page-title {
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  font-weight: 800;
+  color: rgba(44, 36, 32, 0.55);
+  font-size: 12px;
+}
+
+.cozycat-page-desc {
+  color: rgba(44, 36, 32, 0.75);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* =========================
+   MUSIC screen
+   ========================= */
+.cozycat-music-screen { height: 100%; }
+
+.cozycat-music-content{
+  padding: 76px 32px 24px; /* เว้น top ให้พอดีกับ back เหมือน status */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.cozycat-music-vinyl-area{ position: relative; }
+
+.cozycat-music-vinyl{
+  position: relative;
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  background: #111;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  border: 1px solid rgba(0,0,0,0.10);
+}
+
+.cozycat-music-grooves{
+  position:absolute; inset:0;
+  border-radius:50%;
+  background: repeating-radial-gradient(#111, #111 2px, #222 3px);
+  opacity: .8;
+}
+
+.cozycat-music-cover{
+  width: 90px; height: 90px;
+  border-radius: 50%;
+  object-fit: cover;
+  z-index: 2;
+  border: 4px solid #F7F5F0;
+}
+
+.spin-animation{ animation: cozycatSpin 8s linear infinite; }
+.paused-animation{ animation-play-state: paused; }
+@keyframes cozycatSpin { 100% { transform: rotate(360deg); } }
+
+.cozycat-music-stylus{
+  position: absolute;
+  top: -40px; right: -20px;
+  width: 15px; height: 100px;
+  background: #9ca3af;
+  border-radius: 5px;
+  transform-origin: top center;
+  transform: rotate(-30deg);
+  transition: transform .5s ease;
+  z-index: 10;
+}
+.cozycat-music-stylus.playing{ transform: rotate(0deg); }
+
+.cozycat-music-stylus-knob{
+  width: 20px; height: 20px;
+  background: #6b7280;
+  border-radius: 50%;
+  position: absolute;
+  top: -5px; left: -2px;
+}
+
+.cozycat-music-track{ text-align:center; }
+.cozycat-music-tag{
+  font-family: "Cinzel", serif;
+  font-size: .7rem;
+  letter-spacing: .2em;
+  color: #9ca3af;
+  margin-bottom: .5rem;
+}
+.cozycat-music-title{
+  font-family: "Playfair Display", serif;
+  font-size: 34px;
+  line-height: 1;
+  font-style: italic;
+  font-weight: 600;
+  margin-bottom: .35rem;
+}
+.cozycat-music-artist{
+  font-size: .85rem;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.cozycat-music-controls{ width: 100%; }
+
+.cozycat-music-progress{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.cozycat-music-progressbar{
+  -webkit-appearance:none;
+  width: 100%;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.cozycat-music-progressbar::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width: 12px; height: 12px;
+  background: #2C2420;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.cozycat-music-btnrow{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap: 32px;
+  margin-bottom: 14px;
+}
+
+.cozycat-music-btn{
+  background:none;
+  border:none;
+  cursor:pointer;
+  color: #2C2420;
+  opacity:.8;
+}
+.cozycat-music-btn:disabled{ opacity:.25; cursor: default; }
+
+.cozycat-music-play{
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: #2C2420;
+  color: #F7F5F0;
+  border: none;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow: 0 10px 20px rgba(44,36,32,0.2);
+  cursor: pointer;
+}
+.cozycat-music-play svg { fill: currentColor; }
+
+.cozycat-music-sign{
+  text-align:center;
+  font-family: "La Belle Aurore", cursive;
+  color: #9ca3af;
+  font-size: 18px;
+  margin-top: 12px;
+}
+
+/* =========================
+   Responsive tweaks
+   ========================= */
+@media (max-height: 740px) {
+  .cozycat-home { padding: 22px; }
+  .cozycat-title { font-size: 52px; }
+  .cozycat-watermark { font-size: 84px; }
+  .cozycat-menu { gap: 18px; margin-bottom: 22px; }
+}
+
+/* Mobile: align top */
+@media (max-width: 768px) {
+  .cozycat-overlay { align-items: flex-start; }
+  .cozycat-screen { margin-top: 10px; }
+  .cozycat-paw-btn { backdrop-filter: none; }
+}
+
+/* =========================
+   CozyCat Reset Button
+   ========================= */
+.cozycatResetBtn {
+  background: transparent;
+  border: 1px solid;
+  padding: 6px 8px;
+
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+
+  
+  opacity: 0.65;
+
+  cursor: pointer;
+  border-radius: 8px;
+
+  transition:
+    opacity 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.cozycatResetBtn:hover {
+  opacity: 1;
+  background-color: rgba(44, 36, 32, 0.06);
+}
+
+.cozycatResetBtn:active {
+  background-color: rgba(44, 36, 32, 0.12);
+}
+
+
+
+/* Cozy reset confirm modal */
+.cozycat-confirm-backdrop{
+  position: fixed;
+  inset: 0;
+  z-index: 1000000;
+  background: rgba(0,0,0,.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.cozycat-confirm-dialog{
+  width: min(360px, 92vw);
+  border-radius: 16px;
+  background: #F7F5F0;
+  border: 1px solid rgba(44,36,32,.15);
+  box-shadow: 0 18px 60px rgba(0,0,0,.35);
+  padding: 14px 14px 12px;
+  color: #2C2420;
+  font-family: "DM Sans", system-ui, sans-serif;
+}
+
+.cozycat-confirm-title{
+  font-weight: 800;
+  letter-spacing: .02em;
+  margin-bottom: 6px;
+}
+
+.cozycat-confirm-text{
+  font-size: 13px;
+  line-height: 1.35;
+  opacity: .85;
+}
+
+.cozycat-confirm-actions{
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.cozycat-confirm-btn{
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  background: rgba(44,36,32,.08);
+  color: #2C2420;
+  font-weight: 700;
+}
+
+.cozycat-confirm-btn:hover{ background: rgba(44,36,32,.12); }
+
+.cozycat-confirm-btn.danger{
+  background: rgba(44,36,32,.95);
+  color: #F7F5F0;
+}
+.cozycat-confirm-btn.danger:hover{ opacity: .92; }
+
+/* =========================
+   CozyCat Confirm Modal (mobile-safe)
+   ========================= */
+.cozycat-confirm-backdrop{
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+
+  /* mobile: ใช้ dvh กันปัญหา address bar */
+  height: 100dvh;
+  min-height: 100vh;
+
+  z-index: 2147483647; /* สูงสุดกันโดนทับ */
+  background: rgba(0,0,0,.45);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* เว้น safe-area กันชน notch / status bar */
+  padding:
+    calc(16px + env(safe-area-inset-top))
+    16px
+    calc(16px + env(safe-area-inset-bottom))
+    16px;
+}
+
+.cozycat-confirm-dialog{
+  width: min(360px, 92vw);
+  border-radius: 16px;
+  background: #F7F5F0;
+  border: 1px solid rgba(44,36,32,.15);
+  box-shadow: 0 18px 60px rgba(0,0,0,.35);
+  padding: 14px 14px 12px;
+  color: #2C2420;
+  font-family: "DM Sans", system-ui, sans-serif;
+
+  /* กันมือถือจอเตี้ย: ให้เลื่อนในกล่องได้ */
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cozycat-confirm-title{
+  font-weight: 800;
+  letter-spacing: .02em;
+  margin-bottom: 6px;
+}
+
+.cozycat-confirm-text{
+  font-size: 13px;
+  line-height: 1.35;
+  opacity: .85;
+}
+
+.cozycat-confirm-actions{
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.cozycat-confirm-btn{
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  background: rgba(44,36,32,.08);
+  color: #2C2420;
+  font-weight: 700;
+}
+
+.cozycat-confirm-btn:hover{ background: rgba(44,36,32,.12); }
+
+.cozycat-confirm-btn.danger{
+  background: rgba(44,36,32,.95);
+  color: #F7F5F0;
+}
+.cozycat-confirm-btn.danger:hover{ opacity: .92; }
