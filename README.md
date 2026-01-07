@@ -49,7 +49,7 @@ This extension listens for specific **hidden HTML comments** in the AI's output 
 
 
 ## 🔥 Special Thanks: 
-- POPKO: Thanks for helping me start things off; otherwise, I'd still be procrastinating, not knowing where to begin.
-- Zeal: Without you, I would have released the extension without realizing there was a serious issue when using it on mobile phones.
+- POPKO: Thanks for helping me start things off; otherwise, I wouldn’t know where to begin.
+- Zeal: Without you, I would have released the extension without realizing there was a serious issue.
 - Fox.Jong, Malibee, Madee, Phakrop: Thank for being helpful testers.  
 
