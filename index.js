@@ -62,7 +62,7 @@ function loadSettings() {
           <div class="styled_description_block" style="text-align:center;">
             <small>
               Created by <a href="https://bio.site/deMors" target="_blank" rel="noopener noreferrer">Mors</a>
-              with help of POPKO<br>
+              with help of Friends<br>
               Hopefully, you guys enjoy it. Have fun:)
             </small>
           </div>
