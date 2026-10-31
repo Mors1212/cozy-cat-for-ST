@@ -224,6 +224,111 @@ function getCtx() {
   return (typeof SillyTavern !== 'undefined' && SillyTavern?.getContext) ? SillyTavern.getContext() : null;
 }
 
+// ===== Shared cat (same cat in every chat with this character) =====
+// The latest cat state is mirrored into extension settings (saved on the
+// server) keyed by character. A chat with no cat, or with an older one,
+// adopts it when opened. A new gacha replaces it everywhere.
+function newCatId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function getCharKey(ctx) {
+  if (!ctx || ctx.groupId) return null; // group chats stay per-chat
+  const ch = ctx.characters?.[ctx.characterId];
+  return ch?.avatar ? `char:${ch.avatar}` : null;
+}
+
+function getChatKey(ctx) {
+  try { return (typeof ctx?.getCurrentChatId === 'function' ? ctx.getCurrentChatId() : ctx?.chatId) ?? null; } catch { return null; }
+}
+
+function readSharedCat(ctx) {
+  const key = getCharKey(ctx);
+  if (!key) return null;
+  return ctx.extensionSettings?.[extensionName]?.cats?.[key] || null;
+}
+
+function writeSharedCat(ctx, state) {
+  const key = getCharKey(ctx);
+  if (!key || !ctx.extensionSettings) return;
+  const root = ctx.extensionSettings[extensionName] || (ctx.extensionSettings[extensionName] = {});
+  root.cats = root.cats || {};
+  const copy = JSON.parse(JSON.stringify(state));
+  delete copy.statusLedger; // per-chat bookkeeping
+  delete copy.ledgerFrom;
+  copy.chatKey = getChatKey(ctx);
+  root.cats[key] = copy;
+  try { ctx.saveSettingsDebounced?.(); } catch {}
+}
+
+// Turn the shared record into this chat's state.
+function adoptSharedCat(ctx, shared) {
+  const s = mergeCatState(JSON.parse(JSON.stringify(shared)));
+  delete s._reset;
+  s.statusLedger = {};
+  s.ledgerFrom = ctx?.chat?.length ?? 0;
+  const ageDays = s.rp?.ageDays ?? s.rp?.baseAgeDays ?? 63;
+  if (shared.chatKey !== getChatKey(ctx)) {
+    // Different chat = different story calendar. Keep the age, re-anchor
+    // the timeline on this chat's next calendar block (no decay jump).
+    s.rp = { ...s.rp, start: null, current: null, epochNarrativeYear: null, rebase: true, rebaseAge: ageDays };
+    delete s.rp.lastDecayEpochMin;
+  }
+  s.profile.age = formatAgeMonthsDays(ageDays);
+  return s;
+}
+
+// On chat open: if the shared cat is newer than this chat's, take it.
+async function syncWithSharedCat() {
+  const ctx = getCtx();
+  if (!ctx?.chatMetadata || typeof ctx.saveMetadata !== 'function') return false;
+  const shared = readSharedCat(ctx);
+  if (!shared) return false;
+  const meta = ctx.chatMetadata[CAT_META_KEY];
+  if (meta && (Number(meta.updatedAt) || 0) >= (Number(shared.updatedAt) || 0)) return false;
+
+  if (shared._reset === true) {
+    if (!meta || meta._reset === true) return false;
+    ctx.chatMetadata[CAT_META_KEY] = { _reset: true, updatedAt: shared.updatedAt };
+  } else {
+    ctx.chatMetadata[CAT_META_KEY] = adoptSharedCat(ctx, shared);
+  }
+  try { await ctx.saveMetadata(); } catch (e) { console.warn('[cozy-cat-for-ST] saveMetadata failed', e); }
+  return true;
+}
+
+const GACHA_FIELDS = ['type', 'sex', 'urlcat', 'spirit', 'social', 'vocal', 'crime', 'lifestyle'];
+
+// A COZY_CAT_DATA block in an AI message = a newly rolled cat.
+async function syncGachaForMessage(idx) {
+  const ctx = getCtx();
+  const msg = ctx?.chat?.[idx];
+  if (!msg || msg.is_user || msg.is_system) return false;
+  const data = extractCozyCatData(msg.mes ?? '');
+  if (!data || typeof data !== 'object') return false;
+
+  const key = JSON.stringify(GACHA_FIELDS.map((f) => data[f] ?? null));
+  const cur = loadCatState();
+  if (cur.gachaKey === key) return false; // same roll seen again
+
+  // Cats from before this update have no gachaKey: if it's the same cat, just tag it.
+  if (!cur.gachaKey && GACHA_FIELDS.every((f) => (data[f] ?? cur.profile[f]) === cur.profile[f])) {
+    cur.gachaKey = key;
+    await saveCatState(cur);
+    return false;
+  }
+
+  const s = defaultCatState();
+  for (const f of GACHA_FIELDS) if (data[f] != null) s.profile[f] = data[f];
+  s.gachaKey = key;
+  s.catId = newCatId();
+  s.statusLedger = {};
+  s.ledgerFrom = idx;
+  s.profile.age = formatAgeMonthsDays(s.rp.ageDays);
+  await saveCatState(s);
+  return true;
+}
+
 function loadCatState() {
   // 1) Prefer per-chat metadata (syncs across devices)
   const ctx = getCtx();
@@ -241,18 +346,17 @@ function loadCatState() {
     return s;
   }
 
-  // 2) Fallback: legacy local storage (device-only)
-  try {
-    const raw = localStorage.getItem(CAT_STATE_KEY);
-    if (!raw) return defaultCatState();
-    return mergeCatState(JSON.parse(raw));
-  } catch {
-    return defaultCatState();
-  }
+  // 2) No cat in this chat yet: the character's shared cat follows into new chats
+  const shared = readSharedCat(ctx);
+  if (shared && shared._reset !== true) return adoptSharedCat(ctx, shared);
+  return defaultCatState();
 }
 
 async function saveCatState(state) {
   const ctx = getCtx();
+  state.updatedAt = Date.now();
+  if (!state.catId && state.profile?.type && state.profile.type !== '—') state.catId = newCatId();
+  writeSharedCat(ctx, state);
 
   // Save to chat metadata (server) if available
   if (ctx?.chatMetadata && typeof ctx.saveMetadata === 'function') {
@@ -355,6 +459,155 @@ function applyStatusDelta(state, delta) {
   state.status.happiness = clamp01((state.status.happiness ?? 50) + (Number(d.happiness) || 0));
   state.status.hygiene = clamp01((state.status.hygiene ?? 50) + (Number(d.hygiene) || 0));
   state.status.energy = clamp01((state.status.energy ?? 50) + (Number(d.energy) || 0));
+}
+
+// ===== Per-message status ledger =====
+// Each AI message's delta is recorded by message index, together with the
+// change that was ACTUALLY applied (after 0..100 clamping). When the same
+// message is swiped, regenerated, edited or deleted, the old change is
+// reverted before the new one is applied, so a delta never counts twice.
+const STATUS_KEYS = ['hunger', 'happiness', 'hygiene', 'energy'];
+const LEDGER_WINDOW = 200; // only track the most recent N messages
+
+function statusPayloadKey(p) {
+  if (!p || !p.delta || typeof p.delta !== 'object') return '';
+  return JSON.stringify({
+    d: clampStatusDelta(p.delta),
+    i: p.injured_event === true,
+    r: p.injury_resolved === true,
+  });
+}
+
+function revertLedgerEntry(state, entry) {
+  if (!entry) return;
+  state.status = state.status || {};
+  for (const k of STATUS_KEYS) {
+    const a = Number(entry.applied?.[k]) || 0;
+    if (a) state.status[k] = clamp01((state.status[k] ?? 50) - a);
+  }
+  state.health = state.health || { injured: false };
+  if (entry.injChanged) state.health.injured = !!entry.prevInjured;
+}
+
+function applyLedgerEntry(state, payload) {
+  state.status = state.status || { hunger: 50, happiness: 50, hygiene: 50, energy: 50 };
+  state.health = state.health || { injured: false };
+  const before = {};
+  for (const k of STATUS_KEYS) before[k] = Number(state.status[k] ?? 50);
+  const prevInjured = !!state.health.injured;
+
+  applyStatusDelta(state, clampStatusDelta(payload.delta));
+  if (payload.injured_event === true) state.health.injured = true;
+  if (payload.injury_resolved === true) state.health.injured = false;
+
+  const applied = {};
+  for (const k of STATUS_KEYS) applied[k] = Number(state.status[k]) - before[k];
+  return {
+    key: statusPayloadKey(payload),
+    applied,
+    prevInjured,
+    injChanged: prevInjured !== !!state.health.injured,
+  };
+}
+
+function refreshDerivedHealth(state) {
+  state.health = state.health || { injured: false };
+  const hb = computeHealthBaseStateFromStatus(state.status);
+  state.health.base = hb.base;
+  state.health.value = hb.value;
+  state.health.shown = computeHealthShown(state.health);
+}
+
+// Re-read message #idx and make the stats match its current status block.
+// Returns true if the state changed.
+async function syncStatusForMessage(idx) {
+  const ctx = getCtx();
+  const chat = ctx?.chat;
+  if (!Array.isArray(chat) || !Number.isInteger(idx) || idx < 0) return false;
+
+  const state = loadCatState();
+  const ledger = (state.statusLedger && typeof state.statusLedger === 'object') ? state.statusLedger : {};
+  state.statusLedger = ledger;
+
+  // Messages from before the ledger existed were already counted by older
+  // versions; never re-apply them (e.g. when an old message is edited).
+  if (typeof state.ledgerFrom !== 'number') state.ledgerFrom = idx;
+  if (idx < state.ledgerFrom || idx < chat.length - LEDGER_WINDOW) return false;
+
+  const msg = chat[idx];
+  const isAi = msg && !msg.is_user && !msg.is_system;
+  const payload = isAi ? extractCozyCatStatus(msg.mes ?? '') : null;
+  const newKey = statusPayloadKey(payload);
+  const old = ledger[idx];
+
+  if ((old?.key || '') === newKey) {
+    window.__cozycat_last_skip_reason = newKey ? 'no change' : 'no COZY_CAT_STATUS';
+    return false;
+  }
+
+  if (old) revertLedgerEntry(state, old);
+  if (newKey) ledger[idx] = applyLedgerEntry(state, payload);
+  else delete ledger[idx];
+
+  // Prune entries that fell out of the tracking window.
+  for (const k of Object.keys(ledger)) {
+    if (Number(k) < chat.length - LEDGER_WINDOW) delete ledger[k];
+  }
+
+  refreshDerivedHealth(state);
+  await saveCatState(state);
+  window.__cozycat_status_updates_count = Number(window.__cozycat_status_updates_count || 0) + 1;
+  window.__cozycat_status_last_update_at = Date.now();
+  window.__cozycat_last_skip_reason = '';
+  return true;
+}
+
+// After messages are deleted, revert any ledger entry whose message is gone.
+async function syncLedgerAfterDelete() {
+  const ctx = getCtx();
+  const chat = ctx?.chat;
+  if (!Array.isArray(chat)) return false;
+  const state = loadCatState();
+  const ledger = state.statusLedger;
+  if (!ledger || typeof ledger !== 'object') return false;
+
+  const gone = Object.keys(ledger).map(Number).filter((i) => i >= chat.length).sort((a, b) => b - a);
+  if (!gone.length) return false;
+  for (const i of gone) {
+    revertLedgerEntry(state, ledger[i]);
+    delete ledger[i];
+  }
+  refreshDerivedHealth(state);
+  await saveCatState(state);
+  return true;
+}
+
+// ===== Tell the AI the cat's CURRENT stats (short, ~30 tokens) =====
+// Lets the model roleplay hunger/tiredness consistently with the UI.
+const STATUS_PROMPT_KEY = `${extensionName}:status`;
+
+function updateStatusPrompt() {
+  const ctx = getCtx();
+  if (!ctx || typeof ctx.setExtensionPrompt !== 'function') return;
+  let text = '';
+  try {
+    const enabled = localStorage.getItem(`${extensionName}:enabled`) === 'true';
+    const state = loadCatState();
+    const hasCat = state?.profile?.type && state.profile.type !== '—';
+    if (enabled && hasCat) {
+      const p = state.profile;
+      const s = state.status || {};
+      const h = state.health?.shown || 'Healthy';
+      const known = (v) => v && v !== '—';
+      const name = known(p.name) ? p.name : 'unnamed';
+      const traits = [p.spirit, p.social, p.vocal, p.crime, p.lifestyle].filter(known).join(', ');
+      const age = known(p.age) ? `, age ${p.age}` : '';
+      text = `[Cat: ${name}, ${known(p.sex) ? p.sex + ' ' : ''}${p.type} kitten${age}; traits: ${traits}; `
+        + `now (0-100, high=good): hunger ${s.hunger}, happiness ${s.happiness}, energy ${s.energy}, hygiene ${s.hygiene}; health ${h}]`;
+    }
+  } catch {}
+  // position 1 = in-chat, depth 1 = just above the latest message
+  try { ctx.setExtensionPrompt(STATUS_PROMPT_KEY, text, 1, 1); } catch {}
 }
 
 // ===== RP Calendar -> Age (reads calendar HTML blocks from chat messages) =====
@@ -637,6 +890,15 @@ if (!rp.start) {
     (rp.current.hh ?? 0) !== (nextCurrent.hh ?? 0) ||
     (rp.current.mm ?? 0) !== (nextCurrent.mm ?? 0);
 
+  // Cat arrived from another chat: re-anchor age to this chat's calendar, no decay.
+  if (rp.rebase) {
+    const d0 = Math.max(0, diffDays(rp.start, { y: nextCurrent.y, m: nextCurrent.m, d: nextCurrent.d }));
+    rp.baseAgeDays = Math.max(1, (rp.rebaseAge ?? rp.ageDays ?? 63) - d0);
+    rp.lastDecayEpochMin = ymdhmToEpochMinutes(nextCurrent);
+    delete rp.rebase;
+    delete rp.rebaseAge;
+  }
+
   // 3) If RP time advanced, apply decay or timeskip reset
   // We use rp.lastDecayEpochMin to ensure we apply decay exactly once per 30 min window.
   const prevEpoch = (typeof rp.lastDecayEpochMin === 'number')
@@ -721,6 +983,7 @@ async function rehydrateFromChatHistory() {
 
     // If this chat was previously reset, clear the reset marker now that we found valid cat data.
     if (state._reset === true) delete state._reset;
+    state.gachaKey = JSON.stringify(GACHA_FIELDS.map((f) => data[f] ?? null));
 
     await saveCatState(state);
     return true;
@@ -1031,64 +1294,31 @@ function attachChatHooks() {
   window.__cozycat_hooks_attached = true;
 
   
-eventSource.on(event_types.MESSAGE_RECEIVED, async () => {
-    const last = ctx.chat?.[ctx.chat.length - 1];
+  // Run handlers one at a time so overlapping events can't race on saved state.
+  let cozyQueue = Promise.resolve();
+  const enqueue = (fn) => {
+    cozyQueue = cozyQueue.then(fn).catch((e) => console.warn('[cozy-cat-for-ST] handler failed', e));
+    return cozyQueue;
+  };
+  const resolveIdx = (id) => {
+    const n = Number(id);
+    return Number.isInteger(n) && n >= 0 ? n : (ctx.chat?.length ?? 0) - 1;
+  };
+
+eventSource.on(event_types.MESSAGE_RECEIVED, (messageId) => enqueue(async () => {
+    const idx = resolveIdx(messageId);
+    const last = ctx.chat?.[idx];
     const mes = last?.mes ?? '';
 
-    // 1) If there is a cat-data block, store it (card info)
-    const data = extractCozyCatData(mes);
-    if (data) {
-      const state = loadCatState();
-
-      // lorebook provides: type, sex, urlcat, spirit, social, vocal, crime, lifestyle
-      state.profile.type = data.type ?? state.profile.type;
-      state.profile.sex = data.sex ?? state.profile.sex;
-      state.profile.urlcat = data.urlcat ?? state.profile.urlcat;
-
-      state.profile.spirit = data.spirit ?? state.profile.spirit;
-      state.profile.social = data.social ?? state.profile.social;
-      state.profile.vocal = data.vocal ?? state.profile.vocal;
-      state.profile.crime = data.crime ?? state.profile.crime;
-      state.profile.lifestyle = data.lifestyle ?? state.profile.lifestyle;
-
-      await saveCatState(state);
-    }
+    // 1) A COZY_CAT_DATA block means a new gacha roll: start a fresh cat
+    await syncGachaForMessage(idx);
 
     // 2) Always refresh age/decay from calendar blocks (timeskips may happen anytime)
     await hydrateAgeFromChat();
 
-    // 3) Inline status update (one-call): parse COZY_CAT_STATUS and apply delta
-    const stPayload = extractCozyCatStatus(mes);
-    if (stPayload && stPayload.delta) {
-      const state = loadCatState();
-      const before = JSON.stringify({ status: state.status, health: state.health });
-
-      // Clamp deltas to prevent unrealistic jumps (e.g., negative energy when sleeping)
-      const safeDelta = clampStatusDelta(stPayload.delta);
-      applyStatusDelta(state, safeDelta);
-
-      state.health = state.health || { base: 'Healthy', injured: false };
-      if (stPayload.injured_event === true) state.health.injured = true;
-      if (stPayload.injury_resolved === true) state.health.injured = false;
-
-      const hb = computeHealthBaseStateFromStatus(state.status);
-      state.health.base = hb.base;
-      state.health.value = hb.value;
-      state.health.shown = computeHealthShown(state.health);
-
-      const after = JSON.stringify({ status: state.status, health: state.health });
-
-      if (before !== after) {
-        await saveCatState(state);
-        window.__cozycat_status_updates_count = Number(window.__cozycat_status_updates_count || 0) + 1;
-        window.__cozycat_status_last_update_at = Date.now();
-        window.__cozycat_last_skip_reason = '';
-      } else {
-        window.__cozycat_last_skip_reason = 'no change';
-      }
-} else {
-      window.__cozycat_last_skip_reason = 'no COZY_CAT_STATUS';
-}
+    // 3) Inline status update via the per-message ledger
+    //    (a regenerated/swiped reply replaces the old delta instead of stacking)
+    await syncStatusForMessage(idx);
 
     // 4) Name update: if the AI embedded a COZY_CAT_NAME block, set the cat's name.
     // We process this regardless of whether a status payload exists so that naming
@@ -1101,33 +1331,55 @@ eventSource.on(event_types.MESSAGE_RECEIVED, async () => {
       await saveCatState(stateName);
     }
 
+    updateStatusPrompt();
     refreshIfOverlayOpen();
+  }));
+
+  // Swiping left/right, editing or deleting a reply re-syncs that message's delta.
+  const resync = (messageId) => enqueue(async () => {
+    const i = resolveIdx(messageId);
+    const newCat = await syncGachaForMessage(i);
+    if (await syncStatusForMessage(i) || newCat) refreshIfOverlayOpen();
+    updateStatusPrompt();
   });
+  if (event_types.MESSAGE_SWIPED) eventSource.on(event_types.MESSAGE_SWIPED, resync);
+  if (event_types.MESSAGE_EDITED) eventSource.on(event_types.MESSAGE_EDITED, resync);
+  if (event_types.MESSAGE_UPDATED) eventSource.on(event_types.MESSAGE_UPDATED, resync);
+  if (event_types.MESSAGE_DELETED) {
+    eventSource.on(event_types.MESSAGE_DELETED, () => enqueue(async () => {
+      if (await syncLedgerAfterDelete()) refreshIfOverlayOpen();
+      updateStatusPrompt();
+    }));
+  }
 
   // Update age when user sends messages too (timeskip blocks may be user-authored)
   if (event_types.MESSAGE_SENT) {
-    eventSource.on(event_types.MESSAGE_SENT, async () => {
+    eventSource.on(event_types.MESSAGE_SENT, () => enqueue(async () => {
       await hydrateAgeFromChat();
       // scheduleStatusRecalc('message_sent');
+      updateStatusPrompt();
       refreshIfOverlayOpen();
-    });
+    }));
   }
 
-  // Cross-device / reload: when chat switches or loads, restore cat data for that chat
+  // Cross-device / reload: when chat switches or loads, restore cat data for that chat.
+  // Order matters: take the newer shared cat first, then fall back to history, then calendar.
+  const onChatOpened = () => enqueue(async () => {
+    const a = await syncWithSharedCat();
+    const b = await rehydrateFromChatHistory();
+    const c = await hydrateAgeFromChat();
+    updateStatusPrompt();
+    if (a || b || c) refreshIfOverlayOpen();
+  });
+
   if (event_types.CHAT_CHANGED) {
     eventSource.on(event_types.CHAT_CHANGED, () => {
-      Promise.all([rehydrateFromChatHistory(), hydrateAgeFromChat()]).then((results) => {
-        // scheduleStatusRecalc('chat_changed');
-        if (results.some(Boolean)) refreshIfOverlayOpen();
-      });
+      onChatOpened();
     });
   }
   if (event_types.CHAT_LOADED) {
     eventSource.on(event_types.CHAT_LOADED, () => {
-      Promise.all([rehydrateFromChatHistory(), hydrateAgeFromChat()]).then((results) => {
-        // scheduleStatusRecalc('chat_changed');
-        if (results.some(Boolean)) refreshIfOverlayOpen();
-      });
+      onChatOpened();
     });
   }
 }
@@ -1832,6 +2084,7 @@ applyCatImages(root, state);
     const isEnabled = this.checked;
     localStorage.setItem(enabledKey, String(isEnabled));
     applyEnabledState(isEnabled);
+    updateStatusPrompt();
   });
 
   
@@ -1846,13 +2099,15 @@ applyCatImages(root, state);
 
     // Delete only CozyCat per-chat state
     try {
-      ctx.chatMetadata[CAT_META_KEY] = { _reset: true };
+      ctx.chatMetadata[CAT_META_KEY] = { _reset: true, updatedAt: Date.now() };
+      writeSharedCat(ctx, { _reset: true, updatedAt: Date.now() });
       await ctx.saveMetadata();
     } catch (e) {
       console.warn('[cozy-cat-for-ST] reset saveMetadata failed', e);
     }
 
     // Also clear any in-memory UI
+    updateStatusPrompt();
     refreshIfOverlayOpen();
   }
 applyEnabledState(enabled);
