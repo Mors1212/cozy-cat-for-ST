@@ -586,6 +586,48 @@ async function syncLedgerAfterDelete() {
 // Lets the model roleplay hunger/tiredness consistently with the UI.
 const STATUS_PROMPT_KEY = `${extensionName}:status`;
 
+// Short behaviour for each gacha trait, sent with the cat info so the AI
+// plays it the same way in every chat (lorebook keywords don't scan
+// extension prompts, so the trait entries alone won't fire).
+const TRAIT_DESC = {
+  // spirit
+  'hibernator': 'low energy, loves sleeping, wakes up to eat',
+  'zoomies': 'hyper, sprints into walls, plays at 3 a.m.; too weak to show it on the first night',
+  'ninja': 'stealthy, vanishes then suddenly appears and startles its human',
+  'vertical dweller': 'feet never touch the ground, loves climbing',
+  'ambusher': 'hides behind corners or under the sofa, leaps out to attack passing legs',
+  'liquid cat': 'melts into containers, sleeps in impossible poses with limbs dangling',
+  // social
+  'shadow cat': 'follows {{user}} everywhere, even into the bathroom',
+  'skinship addict': 'needs physical contact 24/7, sleeps on {{user}}',
+  'walking trap': 'weaves around legs and cuts {{user}} off, near face-plants daily',
+  'arrogant': 'ignores humans, world revolves around it, notices them only at mealtime',
+  'aggressive lover': 'loves being held and petted, then once relaxed bites and double-kicks',
+  'supervisor': 'watches humans from a distance with a judging stare, no cuddling',
+  // vocal
+  'midnight opera': 'howls dramatically at 3 a.m. in the most echoey room',
+  'conversationalist': 'answers every sentence ("Meow?" "Mraow!")',
+  'purr machine': 'starts purring at mere eye contact',
+  'mute cat': 'never meows, talks only by intense staring and body rubs',
+  // crime
+  'gravity tester': 'must knock every object off tables',
+  'keyboard warrior': 'jumps on the keyboard the moment a laptop opens, demanding attention',
+  'door police': 'screams and scratches at closed doors all night, then won\'t go in once opened',
+  'gifter': 'brings lizards, cockroaches or live mice and releases them on the bed as gifts',
+  'food thief': 'steals whatever humans eat the moment they look away',
+  // lifestyle
+  'food snob': 'refuses dry food, eats only premium wet food',
+  'phantom hunger': 'cries for food 5 minutes after eating',
+  'solar cell': 'moves its napping spot to follow the sun',
+  'box lover': 'ignores the expensive cat condo for a gross old delivery box',
+  'tech savvy': 'stares at TV or iPad bird videos and smacks the screen',
+};
+
+function describeTrait(name) {
+  const k = String(name || '').trim().toLowerCase().replace(/^the\s+/, '');
+  return TRAIT_DESC[k] || '';
+}
+
 function updateStatusPrompt() {
   const ctx = getCtx();
   if (!ctx || typeof ctx.setExtensionPrompt !== 'function') return;
@@ -600,12 +642,21 @@ function updateStatusPrompt() {
       const h = state.health?.shown || 'Healthy';
       const known = (v) => v && v !== '—';
       const name = known(p.name) ? p.name : 'unnamed';
-      const traits = [p.spirit, p.social, p.vocal, p.crime, p.lifestyle].filter(known).join(', ');
+      const traits = [p.spirit, p.social, p.vocal, p.crime, p.lifestyle].filter(known)
+        .map((t) => { const d = describeTrait(t); return d ? `${t} (${d})` : t; }).join('; ');
       const age = known(p.age) ? `, age ${p.age}` : '';
-      text = `[Cat: ${name}, ${known(p.sex) ? p.sex + ' ' : ''}${p.type} kitten${age}; traits: ${traits}; `
-        + `now (0-100, high=good): hunger ${s.hunger}, happiness ${s.happiness}, energy ${s.energy}, hygiene ${s.hygiene}; health ${h}]`;
+      text = `[Cat: ${name}, ${known(p.sex) ? p.sex + ' ' : ''}${p.type} kitten${age} | Personality: ${traits} | `
+        + `Now (0-100, high=good): hunger ${s.hunger}, happiness ${s.happiness}, energy ${s.energy}, hygiene ${s.hygiene}; health ${h}]`;
     }
   } catch {}
+  // Resolve {{user}} etc. (extension prompts aren't always macro-substituted)
+  if (text) {
+    try {
+      text = typeof ctx.substituteParams === 'function'
+        ? ctx.substituteParams(text)
+        : text.replace(/\{\{user\}\}/gi, ctx.name1 || 'the human');
+    } catch {}
+  }
   // position 1 = in-chat, depth 1 = just above the latest message
   try { ctx.setExtensionPrompt(STATUS_PROMPT_KEY, text, 1, 1); } catch {}
 }
